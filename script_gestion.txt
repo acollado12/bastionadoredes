@@ -1,0 +1,146 @@
+$dominio = "caminas"
+$sufijoDominio = "edu-gva.ciber"
+
+
+function mostrarMenu 
+{ 
+     param ( 
+           [string]$Titulo = 'Selección de opciones' 
+     ) 
+     Clear-Host 
+     Write-Host "================ $Titulo================" 
+      
+     
+     Write-Host "1. Creación Usuarios" 
+     Write-Host "2. Creación unidades organizativas" 
+     Write-Host "3. Creación grupos"
+     Write-Host "4. Dar de alta equipos" 
+     Write-Host "S. Presiona 'S' para salir" 
+}
+#Bucle principal del Script. El bucle se ejecuta de manera infinita hasta que se cumple
+#la condición until ($input -eq 's'), es decir, hasta que se pulse la tecla s.
+do 
+{ 
+     #Llamamos a la función mostrarMenu, para dibujar el menú de opciones por pantalla
+     mostrarMenu 
+     #Recogemos en la varaible input, el valor que el usuario escribe por teclado (opción del menú)
+     $input = Read-Host "Elige una opción" 
+     switch ($input) 
+     { 
+           '1' { 
+
+                Clear-Host
+       
+               $empleados=Import-Csv -Path usuariosSistema.csv -Delimiter ","
+               
+               foreach ($empleado in $empleados){
+               $nombre=$empleado.Name
+               $apellido=$empleado.Surname1
+               $apellido2=$empleado.Surname2
+               $dni=$empleado.Dni 
+               $departamento=$empleado.Departament
+               $nombrepunto=$empleado.Name + "." + $empleado.Surname1
+               $nombreentero=$empleado.Name + " " + $empleado.Surname1
+               $contrasenafinal=$empleado.Dni
+
+
+               New-ADUser 
+               -Name $nombreentero 
+               -Path "OU=$Departamentos, DC=CAMINAS, DC=EDU-GVA, DC=CIBER" 
+               -SamAccountName $nombrepunto 
+               -UserPrincipalName "$nombreentero@CAMINAS.EDU-GVA.CIBER" 
+               -AccountPassword (ConvertTo-SecureString "$contrasenafinal" -AsPlainText -Force) 
+               -GivenName $nombre 
+               -Surname $apellido 
+               -ChangePasswordAtLogon $true 
+               -Enabled $true 
+                pause
+                }
+           } '2' { 
+                Clear-Host  
+                'Creación unidades organizativas' 
+                Clear-Host
+                $domainComponent="dc="+$dominio+",dc="+$sufijoDominio ##FALTA CAMBIAR
+                $unidadesOrg = import-csv -Path C:\Users\Administrador.JUPITER\Desktop\unidades.csv -delimiter ":"
+                
+                foreach ($unidad in $unidadesOrg ){
+                    $nombre=$unidad.nombre
+                    $descripcion=$unidad.descripcion
+
+                    New-ADOrganizationalUnit -Name $nombre -Description $descripcion -Path "OU=DEPARTAMENTOS, DC=CAMINAS, DC=EDU-GVA, DC= CIBER"
+                
+                }    
+                    
+                    
+                  
+          
+           } '3' {
+               Clear-Host 
+               'Creacion de grupos'
+               Clear-Host
+               $domainComponent="dc="+$dominio+",dc="+$sufijoDominio ##FALTA CAMBIAR
+               #El fichero csv que leemos es:
+               #Name:Path:Description:Category:Scope
+               #SMR-GG-DepInformatica:OU=Dep-Informatica:Grupo global y de seguridad del Dep.Informatica:Security:Global
+               #
+               #Creación de los grupos a partir de un fichero csv
+               #
+               #Lee el fichero grupos.csv
+               $gruposFic = import-csv -Path C:\Users\Administrador.JUPITER\Desktop\grupos.csv -delimiter ":"
+               foreach($grupo in $GruposFic)
+               {
+	                    $pathObject=$grupo.Path+","+$domainComponent
+	                    #Comprobamos si no existe el grupo antes de crearlo.
+	                    if ( !(Get-ADGroup -Filter { name -eq $grupo.Name }) )
+	                    {
+		                         New-ADGroup -Name:$grupo.Name -Description:$grupo.Description `
+		                         -GroupCategory:$grupo.Category `
+		                         -GroupScope:$grupo.Scope  `
+		                         -Path:$pathObject
+	                    }
+	                    else { Write-Host "El grupo $line.Name ya existe en el sistema"}
+               }
+          
+          } 4 {
+               #Para este caso de ejemplo, usamos el csv que contiene lo siguiente
+               #Computer:Path
+               #W10-CLI001:OU=Equipos-DepInf,OU=Dep-Informatica
+               #W10-CLI002:OU=Equipos-DepInf,OU=Dep-Informatica
+               Clear-Host
+               'Creación de Equipos'
+               $domainComponent="dc="+$dominio+",dc="+$sufijoDominio ##FALTA CAMBIAR
+               $equiposFic= import-csv -Path C:\Users\Administrador.JUPITER\Desktop\equipos.csv -delimiter ":"
+          
+               foreach($equipo in $equiposFic)
+               {
+	                    $pathObject=$line.Path+","+$domainComponent	
+	                    #Comprobamos que no exista el equipo en el sistema
+	                    if ( !(Get-ADComputer -Filter { name -eq $equipo.Computer }) )
+	                    {
+		                         New-ADComputer -Enabled:$true -Name:$equipo.Computer -Path:$pathObject -SamAccountName:$equipo.Computer
+	                    }
+	                    else { Write-Host "El equipo $equipo.Computer ya existe en el sistema"}
+               }
+
+               write-Host ""
+               write-Host "Se han creado los equipos" -Fore green
+               write-Host "" 
+          
+          
+          
+          
+          }
+           's' {
+                'Saliendo del script...'
+                return 
+           } 
+           #Si no se selecciona una de las opciones del menú, es decir, se pulsa algun carácter
+           #que no sea 1, 2, 3 o s, sacamos por pantalla un aviso e indicamos lo que hay que realizar.
+           default { 
+              'Por favor, Pulse una de las opciones disponibles [1-4] o s para salir'
+           }
+     } 
+     pause 
+} 
+until ($input -eq 's')
+
